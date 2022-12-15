@@ -78,26 +78,18 @@ export async function imageFetchingMiddleware(
                 imageJailFs.mkdirSync(dir, { recursive: true })
             }
 
-            const writeStream = imageJailFs.createWriteStream(
-                ppath.resolve(path as Filename),
-            )
-
-            writeStream.on("finish", () => {
+            try {
+                await imageJailFs.writeFilePromise(
+                    ppath.resolve(path as Filename),
+                    axiosResponse.data,
+                )
                 log(LogLevel.INFO, `Saved image ${path} to disk.`)
-
-                writeStream.close()
-            })
-
-            writeStream.on("error", (err) => {
+            } catch (e) {
                 log(
                     LogLevel.ERROR,
-                    `Failed to save image ${path} to disk: ${err}`,
+                    `Failed to save image ${path} to disk: ${e}`,
                 )
-
-                writeStream.close()
-            })
-
-            axiosResponse.data.pipe(writeStream)
+            }
         }
     } catch (e) {
         log(LogLevel.DEBUG, `[Image loading] Err ${e} ${e.stack}`)
