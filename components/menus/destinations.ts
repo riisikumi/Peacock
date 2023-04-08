@@ -22,6 +22,7 @@ import type {
     GameLocationsData,
     GameVersion,
     MissionStory,
+    OpportunityStatistics,
     PeacockLocationsData,
     RequestWithJwt,
     Unlockable,
@@ -37,10 +38,7 @@ type GameFacingDestination = {
         CompletedChallengesCount: number
     }
     CompletionData: CompletionData
-    OpportunityStatistics: {
-        Count: number
-        Completed: number
-    }
+    OpportunityStatistics: OpportunityStatistics
     LocationCompletionPercent: number
     Location: Unlockable
 }

@@ -42,6 +42,7 @@ import {
     getDestinationCompletion,
 } from "./menus/destinations"
 import type {
+    ChallengeCategoryCompletion,
     CommonSelectScreenConfig,
     ContractSearchResult,
     GameVersion,
@@ -102,6 +103,7 @@ import {
 } from "./types/gameSchemas"
 import assert from "assert"
 import { SniperLoadoutConfig } from "./menus/sniper"
+import { ChallengeFilterType } from "./candle/challengeHelpers"
 
 export const preMenuDataRouter = Router()
 const menuDataRouter = Router()
@@ -249,6 +251,7 @@ menuDataRouter.get("/Hub", (req: RequestWithJwt, res) => {
         const location = locations.children[child]
         const challenges = controller.challengeService.getChallengesForLocation(
             child,
+            ChallengeFilterType.Contracts,
             req.gameVersion,
         )
         const challengeCompletion =
@@ -1828,12 +1831,81 @@ menuDataRouter.post(
     createLoadSaveMiddleware("SaveMenuTemplate"),
 )
 
-//TODO: Add statistics
 menuDataRouter.get("/PlayerProfile", (req: RequestWithJwt, res) => {
     const playerProfilePage = getConfig<PlayerProfileView>(
         "PlayerProfilePage",
         true,
     )
+
+    const locationData = getVersionedConfig<PeacockLocationsData>(
+        "LocationsData",
+        req.gameVersion,
+        false,
+    )
+
+    playerProfilePage.data.SubLocationData = []
+
+    for (const subLocationKey in locationData.children) {
+        //Ewww...
+        if (
+            subLocationKey === "LOCATION_ICA_FACILITY_ARRIVAL" ||
+            subLocationKey === "LOCATION_HOKKAIDO_SHIM_MAMUSHI" ||
+            subLocationKey.search("SNUG_") > 0
+        ) {
+            continue
+        }
+
+        const subLocation = locationData.children[subLocationKey]
+        const parentLocation =
+            locationData.parents[subLocation.Properties.ParentLocation]
+
+        const completionData = generateCompletionData(
+            subLocation.Id,
+            req.jwt.unique_name,
+            req.gameVersion,
+        )
+
+        //TODO: Make getDestinationCompletion to do something like this.
+        const challenges = controller.challengeService.getChallengesForLocation(
+            subLocation.Id,
+            ChallengeFilterType.None,
+            req.gameVersion,
+        )
+
+        const challengeCategoryCompletion: ChallengeCategoryCompletion[] = []
+
+        for (const challengeGroup in challenges) {
+            const challengeCompletion =
+                controller.challengeService.countTotalNCompletedChallenges(
+                    {
+                        challengeGroup: challenges[challengeGroup],
+                    },
+                    req.jwt.unique_name,
+                    req.gameVersion,
+                )
+
+            challengeCategoryCompletion.push({
+                Name: challenges[challengeGroup][0].CategoryName,
+                ...challengeCompletion,
+            })
+        }
+
+        const destinationCompletion = getDestinationCompletion(
+            parentLocation,
+            req,
+        )
+
+        playerProfilePage.data.SubLocationData.push({
+            ParentLocation: parentLocation,
+            Location: subLocation,
+            CompletionData: completionData,
+            ChallengeCategoryCompletion: challengeCategoryCompletion,
+            ChallengeCompletion: destinationCompletion.ChallengeCompletion,
+            OpportunityStatistics: destinationCompletion.OpportunityStatistics,
+            LocationCompletionPercent:
+                destinationCompletion.LocationCompletionPercent,
+        })
+    }
 
     const userProfile = getUserData(req.jwt.unique_name, req.gameVersion)
     playerProfilePage.data.PlayerProfileXp.Total =

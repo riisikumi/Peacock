@@ -17,6 +17,7 @@
  */
 
 import type {
+    ChallengeCompletion,
     ChallengeProgressionData,
     ChallengeTreeWaterfallState,
     ClientToServerEvent,
@@ -543,6 +544,7 @@ export class ChallengeService extends ChallengeRegistry {
 
     getChallengesForLocation(
         child: string,
+        filterType: ChallengeFilterType,
         gameVersion: GameVersion,
     ): GroupIndexedChallengeLists {
         const locations = getVersionedConfig<PeacockLocationsData>(
@@ -551,22 +553,30 @@ export class ChallengeService extends ChallengeRegistry {
             true,
         )
         const parent = locations.children[child].Properties.ParentLocation
-        const location = locations.children[child]
-        assert.ok(location)
 
-        let contracts = isSniperLocation(child)
-            ? this.controller.missionsInLocations.sniper[child]
-            : this.controller.missionsInLocations[child]
-        if (!contracts) {
-            contracts = []
-        }
+        let challengeFilterOptions: ChallengeFilterOptions
 
-        return this.getGroupedChallengeLists(
-            {
+        if (filterType === ChallengeFilterType.None) {
+            challengeFilterOptions = {
+                type: ChallengeFilterType.None,
+            }
+        } else {
+            let contracts = isSniperLocation(child)
+                ? this.controller.missionsInLocations.sniper[child]
+                : this.controller.missionsInLocations[child]
+            if (!contracts) {
+                contracts = []
+            }
+
+            challengeFilterOptions = {
                 type: ChallengeFilterType.Contracts,
                 contractIds: contracts,
                 locationId: child,
-            },
+            }
+        }
+
+        return this.getGroupedChallengeLists(
+            challengeFilterOptions,
             parent,
             gameVersion,
         )
@@ -930,6 +940,7 @@ export class ChallengeService extends ChallengeRegistry {
 
         const forLocation = this.getChallengesForLocation(
             locationId,
+            ChallengeFilterType.None,
             gameVersion,
         )
 
@@ -1187,7 +1198,7 @@ export class ChallengeService extends ChallengeRegistry {
         challengeLists: GroupIndexedChallengeLists,
         userId: string,
         gameVersion: GameVersion,
-    ): { ChallengesCount: number; CompletedChallengesCount: number } {
+    ): ChallengeCompletion {
         const userData = getUserData(userId, gameVersion)
 
         userData.Extensions.ChallengeProgression ??= {}
@@ -1209,6 +1220,7 @@ export class ChallengeService extends ChallengeRegistry {
         return {
             ChallengesCount: challengesCount,
             CompletedChallengesCount: completedChallengesCount,
+            CompletionPercent: completedChallengesCount / challengesCount,
         }
     }
 
